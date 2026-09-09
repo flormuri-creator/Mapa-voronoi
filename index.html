@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapeo Digital - Diagrama de Voronoi interactivo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        h1 { color: #0275d8; margin-top: 0; }
+        .instructions { background: #e9ecef; padding: 12px; border-radius: 6px; margin-bottom: 20px; }
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #0275d8;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover { background-color: #0157a0; }
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background-color: #aed6f1; /* Simula el océano/fondo */
+        }
+        canvas { display: block; cursor: crosshair; }
+        .info-panel {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-left: 5px solid #0275d8;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>5. Mapeo Digital Interactiva (Prototipo)</h1>
+    <p class="instructions">
+        <strong>¿Cómo funciona?</strong> Pon una dirección ficticia (por ejemplo: "Puebla", "Oaxaca", "Veracruz" o coordenadas X,Y entre 0 y 800) o simplemente <strong>haz clic en cualquier parte del mapa</strong> para buscar la torre de alerta sísmica más cercana.
+    </p>
+
+    <div class="search-box">
+        <input type="text" id="address-input" placeholder="Escribe una zona, estado de México o coordenadas (ej: 400, 250)...">
+        <button onclick="searchLocation()">Buscar punto cercano</button>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="voronoiCanvas" width="800" height="450"></canvas>
+    </div>
+
+    <div class="info-panel" id="result-panel">
+        <strong>Estado del sistema:</strong> Esperando interacción. Haz clic en el mapa para ubicar tu posición.
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('voronoiCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Torres de alerta simuladas (Puntos de control del Voronoi) basados en tu mapa de México
+    const torres = [
+        { id: 1, name: "Torre Michoacán", x: 180, y: 280, color: "#f9e79f" },
+        { id: 2, name: "Torre Guerrero", x: 260, y: 340, color: "#f5b7b1" },
+        { id: 3, name: "Torre Puebla", x: 340, y: 260, color: "#d5f5e3" },
+        { id: 4, name: "Torre Veracruz Norte", x: 420, y: 210, color: "#e8daef" },
+        { id: 5, name: "Torre Oaxaca Centro", x: 410, y: 330, color: "#f5cbf7" },
+        { id: 6, name: "Torre Veracruz Sur", x: 500, y: 290, color: "#fdebd0" },
+        { id: 7, name: "Torre Chiapas", x: 620, y: 360, color: "#d6eaf8" }
+    ];
+
+    let userLocation = null;
+
+    // Función para renderizar dinámicamente las regiones de Voronoi píxel por píxel
+    function drawVoronoi() {
+        const width = canvas.width;
+        const height = canvas.height;
+        const imgData = ctx.createImageData(width, height);
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                // Para cada píxel, buscamos la torre más cercana
+                let minDist = Infinity;
+                let closestTorre = torres[0];
+
+                for (let t of torres) {
+                    let d = Math.hypot(x - t.x, y - t.y);
+                    if (d < minDist) {
+                        minDist = d;
+                        closestTorre = t;
+                    }
+                }
+
+                // Convertir color HEX a RGB para pintar la celda
+                let rgb = hexToRgb(closestTorre.color);
+                let idx = (y * width + x) * 4;
+                imgData.data[idx] = rgb.r;
+                imgData.data[idx+1] = rgb.g;
+                imgData.data[idx+2] = rgb.b;
+                imgData.data[idx+3] = 255; // Opacidad
+            }
+        }
+        ctx.putImageData(imgData, 0, 0);
+
+        // Dibujar las líneas de la costa/tierra de forma muy abstracta y estilizada
+        ctx.fillStyle = "#333";
+        ctx.font = "16px sans-serif";
+        ctx.fillText("Golfo de México", 450, 100);
+        ctx.fillText("Océano Pacífico", 80, 400);
+
+        // Dibujar las torres físicas en el mapa
+        torres.forEach(t => {
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = "#ff0000";
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.fillStyle = "#2c3e50";
+            ctx.font = "bold 11px Arial";
+            ctx.fillText(t.name, t.x - 30, t.y - 12);
+        });
+
+        // Dibujar el punto del usuario si existe
+        if (userLocation) {
+            ctx.beginPath();
+            ctx.arc(userLocation.x, userLocation.y, 8, 0, 2 * Math.PI);
+            ctx.fillStyle = "#0000ff";
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.stroke();
+
+            // Línea de conexión a la torre más cercana
+            ctx.beginPath();
+            ctx.moveTo(userLocation.x, userLocation.y);
+            ctx.lineTo(userLocation.closest.x, userLocation.closest.y);
+            ctx.strokeStyle = "#0000ff";
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset
+        }
+    }
+
+    function hexToRgb(hex) {
+        let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : {r: 0, g: 0, b: 0};
+    }
+
+    // Calcular matemáticamente el vecino más cercano (Algoritmo Voronoi de búsqueda directa)
+    function findClosestTorre(x, y) {
+        let minD = Infinity;
+        let closest = null;
+        torres.forEach(t => {
+            let d = Math.hypot(x - t.x, y - t.y);
+            if (d < minD) {
+                minD = d;
+                closest = t;
+            }
+        });
+        return { closest, distance: Math.round(minD) };
+    }
+
+    // Interacción por Click
+    canvas.addEventListener('click', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        const res = findClosestTorre(x, y);
+        userLocation = { x, y, closest: res.closest };
+        
+        drawVoronoi();
+        document.getElementById('result-panel').innerHTML = `
+            <strong>📍 Ubicación seleccionada:</strong> Coordenadas (${Math.round(x)}, ${Math.round(y)})<br>
+            <strong>🚨 Torre sísmica asignada (Más cercana):</strong> <span style="color:#d9534f; font-weight:bold;">${res.closest.name}</span><br>
+            <strong>📏 Distancia geométrica relativa:</strong> ${res.distance} unidades métricas.
+        `;
+    });
+
+    // Simulación del cuadro de búsqueda de direcciones
+    function searchLocation() {
+        const input = document.getElementById('address-input').value.toLowerCase();
+        let targetX = 400, targetY = 250; // por defecto centro
+
+        if (input.includes("puebla")) { targetX = 350; targetY = 250; }
+        else if (input.includes("oaxaca")) { targetX = 420; targetY = 340; }
+        else if (input.includes("veracruz")) { targetX = 480; targetY = 260; }
+        else if (input.includes("chiapas")) { targetX = 640; targetY = 350; }
+        else if (input.includes("guerrero")) { targetX = 270; targetY = 330; }
+        else if (input.includes("michoacan") || input.includes("michoacán")) { targetX = 190; targetY = 270; }
+        else if (input.split(',').length === 2) {
+            const coords = input.split(',');
+            targetX = parseFloat(coords[0]) || 400;
+            targetY = parseFloat(coords[1]) || 250;
+        }
+
+        const res = findClosestTorre(targetX, targetY);
+        userLocation = { x: targetX, y: targetY, closest: res.closest };
+        drawVoronoi();
+        
+        document.getElementById('result-panel').innerHTML = `
+            <strong>🔍 Dirección/Zona interpretada:</strong> "${document.getElementById('address-input').value}" asignada a la zona pixel (${targetX}, ${targetY})<br>
+            <strong>🚨 Torre sísmica asignada (Más cercana):</strong> <span style="color:#d9534f; font-weight:bold;">${res.closest.name}</span><br>
+            <strong>📏 Distancia geométrica aproximada:</strong> ${res.distance} unidades.
+        `;
+    }
+
+    // Inicializar mapa
+    drawVoronoi();
+</script>
+</body>
+</html>
