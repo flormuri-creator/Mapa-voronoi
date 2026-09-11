@@ -3,24 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mapa Real SASMEX - Diagrama de Voronoi</title>
+  <title>Voronoi SASMEX - GitHub Pages</title>
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <style>
-    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     body, html { margin: 0; padding: 0; height: 100%; width: 100%; display: flex; flex-direction: column; }
     
     #header {
       padding: 12px 20px;
-      background: #0f172a;
+      background: #111827;
       color: white;
       display: flex;
       gap: 12px;
       align-items: center;
       z-index: 1000;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
     }
 
     #search-input {
@@ -28,16 +28,16 @@
       max-width: 450px;
       padding: 10px 14px;
       border-radius: 6px;
-      border: 1px solid #334155;
-      background: #1e293b;
+      border: 1px solid #374151;
+      background: #1f2937;
       color: white;
       font-size: 14px;
     }
 
-    #search-input::placeholder { color: #94a3b8; }
+    #search-input::placeholder { color: #9ca3af; }
 
     button {
-      padding: 10px 18px;
+      padding: 10px 16px;
       border: none;
       background: #2563eb;
       color: white;
@@ -49,176 +49,162 @@
 
     button:hover { background: #1d4ed8; }
 
-    .map-toggle {
-      background: #334155;
-      color: #f8fafc;
-      font-size: 13px;
+    .btn-toggle {
+      background: #374151;
     }
+    .btn-toggle:hover { background: #4b5563; }
 
     #info-panel {
       padding: 10px 20px;
-      background: #1e293b;
-      color: #f1f5f9;
+      background: #1f2937;
+      color: #f3f4f6;
       font-size: 14px;
-      border-top: 1px solid #334155;
+      border-top: 1px solid #374151;
     }
 
-    #map { flex: 1; width: 100%; background: #020617; }
+    #map { flex: 1; width: 100%; background: #0f172a; }
 
+    /* Estilo de etiquetas de letras en el mapa */
     .node-label {
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid #3b82f6;
-      border-radius: 4px;
-      padding: 1px 5px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      background: transparent;
+      border: none;
+      box-shadow: none;
       font-weight: bold;
-      color: #60a5fa;
-      font-size: 11px;
+      color: #3b82f6;
+      font-size: 13px;
+      text-shadow: 0 0 3px #000, 0 0 3px #000;
     }
   </style>
 </head>
 <body>
 
   <div id="header">
-    <h3 style="margin: 0; font-size: 18px;">Red Sísmica SASMEX (Voronoi Real)</h3>
-    <input type="text" id="search-input" placeholder="Ingresa una dirección en México (ej. Zócalo Oaxaca, Acapulco, Tehuacán...)">
-    <button onclick="buscarDireccion()">Buscar Dirección</button>
-    <button class="map-toggle" onclick="cambiarCapaMapa()">Cambiar Vista (Satélite / Calle)</button>
+    <h3 style="margin: 0; font-size: 18px;">Voronoi SASMEX</h3>
+    <input type="text" id="search-input" placeholder="Busca un lugar, edificio o ciudad (ej. Zócalo Oaxaca, Tehuacán...)">
+    <button onclick="buscarLugar()">Buscar</button>
+    <button class="btn-toggle" onclick="cambiarCapaMapa()">Cambiar Fondo Google</button>
   </div>
 
   <div id="info-panel">
-    <span id="resultado">🔍 Escribe una dirección real en México para determinar en qué celda de Voronoi se ubica y su sensor más cercano.</span>
+    <span id="resultado">🔍 Ingresa una ubicación o edificio para encontrar el sensor sísmico más cercano.</span>
   </div>
 
   <div id="map"></div>
 
-  <!-- Leaflet JS & Turf.js -->
+  <!-- Leaflet JS y Turf.js -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 
   <script>
-    // 1. Estaciones Sísmicas SASMEX en Servicio (Coordenadas Reales de CIRES/SEGOB)
-    const estacionesSASMEX = [
-      // Zona Puebla / Tehuacán / Oaxaca Norte
-      { id: "CH27", nombre: "Chapulco / Tehuacán", lat: 18.6321, lng: -97.4125 },
-      { id: "VH22", nombre: "Valles Centrales N.", lat: 18.2145, lng: -97.5102 },
-      { id: "TM25", nombre: "Tierra Blanca S.", lat: 18.6110, lng: -96.3450 },
-      { id: "CO25", nombre: "Cosamaloapan W.", lat: 18.2512, lng: -95.9123 },
-      { id: "YC28", nombre: "Huajuapan Norte", lat: 17.9150, lng: -97.4811 },
-      { id: "TC23", nombre: "Teposcolula / Mixteca", lat: 17.6120, lng: -97.5210 },
-      { id: "C24ROT", nombre: "Cuicatlán / Cañada", lat: 17.8011, lng: -96.9531 },
-      { id: "EV21", nombre: "Silacayoapam", lat: 17.5102, lng: -98.1420 },
+    // 1. Inicializar el mapa
+    const map = L.map('map').setView([17.2, -96.8], 7);
 
-      // Zona Oaxaca Centro / Valles / Costa
-      { id: "OX29", nombre: "Oaxaca Centro (Valles)", lat: 17.0654, lng: -96.7236 },
-      { id: "SI37", nombre: "Sierra Juárez S.", lat: 17.1890, lng: -96.6120 },
-      { id: "TA32", nombre: "Tlacolula / Ayutla", lat: 16.9510, lng: -96.4781 },
-      { id: "GX18", nombre: "Miahuatlán / Ejutla", lat: 16.4210, lng: -96.5821 },
-      { id: "SV17", nombre: "Sola de Vega", lat: 16.5120, lng: -96.9812 },
-      { id: "LA03", nombre: "Pinotepa de Don Luis", lat: 16.4211, lng: -98.0512 },
-      { id: "PG28", nombre: "Pinotepa Nacional", lat: 16.3421, lng: -98.0543 },
-      { id: "TJ16", nombre: "Jamiltepec", lat: 16.2810, lng: -97.8120 },
-      { id: "HZ04", nombre: "Puerto Escondido / Colotepec", lat: 15.8617, lng: -97.0654 },
-      { id: "TU05", nombre: "Tututepec", lat: 16.1210, lng: -97.6102 },
-      { id: "MX07", nombre: "San Pedro Pochutla", lat: 15.7410, lng: -96.4612 },
-      { id: "TN06", nombre: "Tonameca", lat: 15.6812, lng: -96.5310 },
-      { id: "PA09", nombre: "Puerto Ángel", lat: 15.6620, lng: -96.4912 },
-      { id: "TG10", nombre: "Santa María Huatulco", lat: 15.8312, lng: -96.3210 },
-      { id: "HM11", nombre: "Huatulco Este", lat: 15.7725, lng: -96.1287 },
-
-      // Istmo de Tehuantepec / Veracruz
-      { id: "LR14", nombre: "Tehuantepec West", lat: 16.3210, lng: -95.2310 },
-      { id: "LC34", nombre: "Ixtepec / Istmo", lat: 16.5610, lng: -95.1012 },
-      { id: "MA35", nombre: "Matías Romero", lat: 16.8812, lng: -95.0410 },
-      { id: "PS36", nombre: "Petapa / Istmo N.", lat: 16.8210, lng: -95.1210 },
-      { id: "CS33", nombre: "Uxpanapa / Veracruz", lat: 17.2312, lng: -94.6120 },
-      { id: "MZ12", nombre: "Salina Cruz", lat: 16.1812, lng: -95.1983 },
-
-      // Zona Guerrero
-      { id: "MQ11", nombre: "Acapulco Costa", lat: 16.8531, lng: -99.8237 },
-      { id: "RE05", nombre: "San Marcos Guerrero", lat: 16.7912, lng: -99.3941 },
-      { id: "HU12", nombre: "Huamuxtitlán", lat: 17.8120, lng: -98.5612 },
-      { id: "MT02", nombre: "Ometepec Guerrero", lat: 16.6847, lng: -98.4168 },
-      { id: "LG01", nombre: "Cuajinicuilapa", lat: 16.4710, lng: -98.4120 }
-    ];
-
-    // 2. Capas de Mapas Reales
-    const mapSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    // 2. Capas de Google Maps directa (Gratis sin API Key)
+    const googleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      attribution: '&copy; Google Maps'
     });
 
-    const mapStreet = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
+    const googleStreets = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      attribution: '&copy; Google Maps'
     });
 
-    // Inicializar mapa centrado en el sur de México
-    const map = L.map('map', {
-      center: [17.2, -96.8],
-      zoom: 7,
-      layers: [mapSatellite] // Inicia en modo Satélite Real
-    });
-
-    let layerActual = 'satellite';
+    // Cargar capa satelital híbrida por defecto
+    googleHybrid.addTo(map);
+    let capaActual = 'hybrid';
 
     function cambiarCapaMapa() {
-      if (layerActual === 'satellite') {
-        map.removeLayer(mapSatellite);
-        map.addLayer(mapStreet);
-        layerActual = 'street';
+      if (capaActual === 'hybrid') {
+        map.removeLayer(googleHybrid);
+        googleStreets.addTo(map);
+        capaActual = 'streets';
       } else {
-        map.removeLayer(mapStreet);
-        map.addLayer(mapSatellite);
-        layerActual = 'satellite';
+        map.removeLayer(googleStreets);
+        googleHybrid.addTo(map);
+        capaActual = 'hybrid';
       }
     }
 
-    // 3. Generar Diagrama de Voronoi Geodésico con Turf.js
+    // 3. Puntos exactos del Voronoi que te gustó
+    const puntosSensores = [
+      { id: "K", label: "CH27", lat: 18.52, lng: -97.28 },
+      { id: "H", label: "TM25", lat: 18.72, lng: -96.25 },
+      { id: "G", label: "CO25", lat: 18.28, lng: -95.95 },
+      { id: "I", label: "VH22", lat: 18.25, lng: -97.55 },
+      { id: "D", label: "YC28", lat: 17.92, lng: -97.42 },
+      { id: "E", label: "TC23", lat: 17.68, lng: -97.22 },
+      { id: "F", label: "C24ROT", lat: 17.85, lng: -96.45 },
+      { id: "M", label: "EV21", lat: 17.55, lng: -98.32 },
+      { id: "C", label: "VH22-S", lat: 17.82, lng: -98.12 },
+      { id: "N", label: "MQ11", lat: 16.78, lng: -99.45 },
+      { id: "O", label: "MT02", lat: 16.58, lng: -98.65 },
+      { id: "Q", label: "LG01", lat: 16.42, lng: -98.50 },
+      { id: "P", label: "LA03", lat: 16.52, lng: -98.15 },
+      { id: "R", label: "PG28", lat: 16.38, lng: -97.85 },
+      { id: "S", label: "TJ16", lat: 16.28, lng: -97.50 },
+      { id: "T", label: "HZ04", lat: 16.02, lng: -97.30 },
+      { id: "U", label: "TU05", lat: 15.90, lng: -97.10 },
+      { id: "V", label: "MX07", lat: 15.80, lng: -96.55 },
+      { id: "A1", label: "TN06", lat: 15.72, lng: -96.32 },
+      { id: "B1", label: "PA09", lat: 15.65, lng: -96.15 },
+      { id: "W", label: "TG10", lat: 15.80, lng: -95.92 },
+      { id: "X", label: "HM11", lat: 15.88, lng: -95.68 },
+      { id: "Y", label: "OX29", lat: 17.08, lng: -96.72 },
+      { id: "Z", label: "SI37", lat: 17.15, lng: -96.85 },
+      { id: "A", label: "TA32", lat: 17.00, lng: -96.48 },
+      { id: "B", label: "GX18", lat: 16.52, lng: -96.60 },
+      { id: "C1", label: "SV17", lat: 16.30, lng: -96.80 },
+      { id: "D1", label: "LR14", lat: 16.55, lng: -95.82 },
+      { id: "E1", label: "LC34", lat: 16.80, lng: -95.35 },
+      { id: "F1", label: "MA35", lat: 16.50, lng: -94.82 },
+      { id: "G1", label: "PS36", lat: 16.82, lng: -94.95 },
+      { id: "H1", label: "CS33", lat: 17.72, lng: -95.12 }
+    ];
+
+    // 4. Crear Voronoi con Turf.js
     const pointsGeoJSON = turf.featureCollection(
-      estacionesSASMEX.map(s => turf.point([s.lng, s.lat], { id: s.id, nombre: s.nombre }))
+      puntosSensores.map(p => turf.point([p.lng, p.lat], { id: p.id, label: p.label }))
     );
 
-    // Bounding Box ajustada exactamente al sur-centro de México
-    const bbox = [-101.5, 14.5, -93.5, 20.0];
+    const bbox = [-101.5, 14.5, -93.5, 20.5];
     const voronoiPolygons = turf.voronoi(pointsGeoJSON, { bbox: bbox });
 
-    // Dibujar celdas de Voronoi sobre el terreno
+    // Dibujar celdas
     L.geoJSON(voronoiPolygons, {
       style: {
-        color: '#f59e0b', // Líneas amarillas de alta visibilidad sobre satélite
-        weight: 2,
-        fillColor: '#3b82f6',
+        color: '#ffffff',
+        weight: 1.8,
+        fillColor: '#2563eb',
         fillOpacity: 0.15
       }
     }).addTo(map);
 
-    // 4. Dibujar Marcadores de Sensores en sus ubicaciones reales
-    estacionesSASMEX.forEach(s => {
-      // Marcador de estación
-      L.circleMarker([s.lat, s.lng], {
-        radius: 6,
+    // Dibujar nodos azules con letras
+    puntosSensores.forEach(p => {
+      L.circleMarker([p.lat, p.lng], {
+        radius: 5,
         color: '#ffffff',
-        weight: 2,
-        fillColor: '#ef4444', // Rojo sensor
+        weight: 1.5,
+        fillColor: '#2563eb',
         fillOpacity: 1
-      }).addTo(map).bindPopup(`<b>Estación SASMEX: ${s.id}</b><br>${s.nombre}<br>Lat: ${s.lat}, Lng: ${s.lng}`);
+      }).addTo(map).bindPopup(`<b>Punto ${p.id}</b><br>Sensor: ${p.label}`);
 
-      // Etiqueta del código de la estación
       L.tooltip({
         permanent: true,
         direction: 'right',
         className: 'node-label',
-        offset: [8, 0]
+        offset: [6, -2]
       })
-      .setContent(s.id)
-      .setLatLng([s.lat, s.lng])
+      .setContent(p.id)
+      .setLatLng([p.lat, p.lng])
       .addTo(map);
     });
 
     let userMarker = null;
 
-    // 5. Búsqueda de Direcciones Reales mediante Geocoding de OpenStreetMap (Nominatim)
-    async function buscarDireccion() {
+    // 5. Buscador de Lugares / Edificios
+    async function buscarLugar() {
       const query = document.getElementById('search-input').value;
       if (!query) return;
 
@@ -229,7 +215,7 @@
         const data = await response.json();
 
         if (data.length === 0) {
-          alert("No se encontró la dirección introducida. Intenta agregar la ciudad o estado.");
+          alert("No se encontró el lugar buscado.");
           return;
         }
 
@@ -237,25 +223,23 @@
         const lng = parseFloat(data[0].lon);
         const searchPoint = turf.point([lng, lat]);
 
-        // Centrar el mapa satelital en la dirección encontrada
-        map.setView([lat, lng], 11);
+        map.setView([lat, lng], 12);
 
         if (userMarker) map.removeLayer(userMarker);
 
         userMarker = L.marker([lat, lng]).addTo(map)
-          .bindPopup(`<b>Ubicación Buscada:</b><br>${data[0].display_name}`)
+          .bindPopup(`<b>Ubicación:</b><br>${data[0].display_name}`)
           .openPopup();
 
-        // Calcular la distancia geodésica real al sensor SASMEX más cercano
         const nearest = turf.nearestPoint(searchPoint, pointsGeoJSON);
         const distKm = turf.distance(searchPoint, nearest, { units: 'kilometers' }).toFixed(2);
 
         document.getElementById('resultado').innerHTML = 
-          `📍 <b>Ubicación:</b> ${data[0].display_name.split(',')[0]} | 🎯 <b>Estación Sísmica más cercana:</b> ${nearest.properties.id} (${nearest.properties.nombre}) | 📏 <b>Distancia directa:</b> ${distKm} km`;
+          `📍 <b>Lugar:</b> ${data[0].display_name.split(',')[0]} | 🎯 <b>Sensor más cercano:</b> Punto ${nearest.properties.id} (${nearest.properties.label}) | 📏 <b>Distancia:</b> ${distKm} km`;
 
       } catch (err) {
         console.error(err);
-        alert("Ocurrió un error al buscar la dirección.");
+        alert("Error al buscar la ubicación.");
       }
     }
   </script>
