@@ -1,0 +1,666 @@
+<!--<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapeo Digital - Diagrama de Voronoi interactivo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        h1 { color: #0275d8; margin-top: 0; }
+        .instructions { background: #e9ecef; padding: 12px; border-radius: 6px; margin-bottom: 20px; }
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #0275d8;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover { background-color: #0157a0; }
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background-color: #aed6f1; /* Simula el océano/fondo */
+        }
+        canvas { display: block; cursor: crosshair; }
+        .info-panel {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-left: 5px solid #0275d8;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>5. Mapeo Digital Interactiva (Prototipo)</h1>
+    <p class="instructions">
+        <strong>¿Cómo funciona?</strong> Pon una dirección ficticia (por ejemplo: "Puebla", "Oaxaca", "Veracruz" o coordenadas X,Y entre 0 y 800) o simplemente <strong>haz clic en cualquier parte del mapa</strong> para buscar la torre de alerta sísmica más cercana.
+    </p>
+
+    <div class="search-box">
+        <input type="text" id="address-input" placeholder="Escribe una zona, estado de México o coordenadas (ej: 400, 250)...">
+        <button onclick="searchLocation()">Buscar punto cercano</button>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="voronoiCanvas" width="800" height="450"></canvas>
+    </div>
+
+    <div class="info-panel" id="result-panel">
+        <strong>Estado del sistema:</strong> Esperando interacción. Haz clic en el mapa para ubicar tu posición.
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('voronoiCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Torres de alerta simuladas (Puntos de control del Voronoi) basados en tu mapa de México
+    const torres = [
+        { id: 1, name: "Torre Michoacán", x: 180, y: 280, color: "#f9e79f" },
+        { id: 2, name: "Torre Guerrero", x: 260, y: 340, color: "#f5b7b1" },
+        { id: 3, name: "Torre Puebla", x: 340, y: 260, color: "#d5f5e3" },
+        { id: 4, name: "Torre Veracruz Norte", x: 420, y: 210, color: "#e8daef" },
+        { id: 5, name: "Torre Oaxaca Centro", x: 410, y: 330, color: "#f5cbf7" },
+        { id: 6, name: "Torre Veracruz Sur", x: 500, y: 290, color: "#fdebd0" },
+        { id: 7, name: "Torre Chiapas", x: 620, y: 360, color: "#d6eaf8" }
+    ];
+
+    let userLocation = null;
+
+    // Función para renderizar dinámicamente las regiones de Voronoi píxel por píxel
+    function drawVoronoi() {
+        const width = canvas.width;
+        const height = canvas.height;
+        const imgData = ctx.createImageData(width, height);
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                // Para cada píxel, buscamos la torre más cercana
+                let minDist = Infinity;
+                let closestTorre = torres[0];
+
+                for (let t of torres) {
+                    let d = Math.hypot(x - t.x, y - t.y);
+                    if (d < minDist) {
+                        minDist = d;
+                        closestTorre = t;
+                    }
+                }
+
+                // Convertir color HEX a RGB para pintar la celda
+                let rgb = hexToRgb(closestTorre.color);
+                let idx = (y * width + x) * 4;
+                imgData.data[idx] = rgb.r;
+                imgData.data[idx+1] = rgb.g;
+                imgData.data[idx+2] = rgb.b;
+                imgData.data[idx+3] = 255; // Opacidad
+            }
+        }
+        ctx.putImageData(imgData, 0, 0);
+
+        // Dibujar las líneas de la costa/tierra de forma muy abstracta y estilizada
+        ctx.fillStyle = "#333";
+        ctx.font = "16px sans-serif";
+        ctx.fillText("Golfo de México", 450, 100);
+        ctx.fillText("Océano Pacífico", 80, 400);
+
+        // Dibujar las torres físicas en el mapa
+        torres.forEach(t => {
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = "#ff0000";
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.fillStyle = "#2c3e50";
+            ctx.font = "bold 11px Arial";
+            ctx.fillText(t.name, t.x - 30, t.y - 12);
+        });
+
+        // Dibujar el punto del usuario si existe
+        if (userLocation) {
+            ctx.beginPath();
+            ctx.arc(userLocation.x, userLocation.y, 8, 0, 2 * Math.PI);
+            ctx.fillStyle = "#0000ff";
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.stroke();
+
+            // Línea de conexión a la torre más cercana
+            ctx.beginPath();
+            ctx.moveTo(userLocation.x, userLocation.y);
+            ctx.lineTo(userLocation.closest.x, userLocation.closest.y);
+            ctx.strokeStyle = "#0000ff";
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset
+        }
+    }
+
+    function hexToRgb(hex) {
+        let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : {r: 0, g: 0, b: 0};
+    }
+
+    // Calcular matemáticamente el vecino más cercano (Algoritmo Voronoi de búsqueda directa)
+    function findClosestTorre(x, y) {
+        let minD = Infinity;
+        let closest = null;
+        torres.forEach(t => {
+            let d = Math.hypot(x - t.x, y - t.y);
+            if (d < minD) {
+                minD = d;
+                closest = t;
+            }
+        });
+        return { closest, distance: Math.round(minD) };
+    }
+
+    // Interacción por Click
+    canvas.addEventListener('click', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        const res = findClosestTorre(x, y);
+        userLocation = { x, y, closest: res.closest };
+        
+        drawVoronoi();
+        document.getElementById('result-panel').innerHTML = `
+            <strong>📍 Ubicación seleccionada:</strong> Coordenadas (${Math.round(x)}, ${Math.round(y)})<br>
+            <strong>🚨 Torre sísmica asignada (Más cercana):</strong> <span style="color:#d9534f; font-weight:bold;">${res.closest.name}</span><br>
+            <strong>📏 Distancia geométrica relativa:</strong> ${res.distance} unidades métricas.
+        `;
+    });
+
+    // Simulación del cuadro de búsqueda de direcciones
+    function searchLocation() {
+        const input = document.getElementById('address-input').value.toLowerCase();
+        let targetX = 400, targetY = 250; // por defecto centro
+
+        if (input.includes("puebla")) { targetX = 350; targetY = 250; }
+        else if (input.includes("oaxaca")) { targetX = 420; targetY = 340; }
+        else if (input.includes("veracruz")) { targetX = 480; targetY = 260; }
+        else if (input.includes("chiapas")) { targetX = 640; targetY = 350; }
+        else if (input.includes("guerrero")) { targetX = 270; targetY = 330; }
+        else if (input.includes("michoacan") || input.includes("michoacán")) { targetX = 190; targetY = 270; }
+        else if (input.split(',').length === 2) {
+            const coords = input.split(',');
+            targetX = parseFloat(coords[0]) || 400;
+            targetY = parseFloat(coords[1]) || 250;
+        }
+
+        const res = findClosestTorre(targetX, targetY);
+        userLocation = { x: targetX, y: targetY, closest: res.closest };
+        drawVoronoi();
+        
+        document.getElementById('result-panel').innerHTML = `
+            <strong>🔍 Dirección/Zona interpretada:</strong> "${document.getElementById('address-input').value}" asignada a la zona pixel (${targetX}, ${targetY})<br>
+            <strong>🚨 Torre sísmica asignada (Más cercana):</strong> <span style="color:#d9534f; font-weight:bold;">${res.closest.name}</span><br>
+            <strong>📏 Distancia geométrica aproximada:</strong> ${res.distance} unidades.
+        `;
+    }
+
+    // Inicializar mapa
+    drawVoronoi();
+</script>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa de Sensores Sísmicos y Diagrama de Voronoi</title>
+
+  <!-- Leaflet CSS 
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    * { box-sizing: border-box; font-family: sans-serif; }
+    body, html { margin: 0; padding: 0; height: 100%; width: 100%; display: flex; flex-direction: column; }
+    
+    #header {
+      padding: 15px;
+      background: #1f2937;
+      color: white;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      z-index: 1000;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    #search-input {
+      flex: 1;
+      min-width: 250px;
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    button {
+      padding: 10px 15px;
+      border: none;
+      background: #2563eb;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover { background: #1d4ed8; }
+
+    #info-panel {
+      padding: 10px 15px;
+      background: #374151;
+      color: #e5e7eb;
+      width: 100%;
+      font-size: 14px;
+    }
+
+    #map { flex: 1; width: 100%; z-index: 1; }
+  </style>
+</head>
+<body>
+
+  <div id="header">
+    <h3 style="margin: 0 10px 0 0;">Sensores SASMEX (Voronoi)</h3>
+    <input type="text" id="search-input" placeholder="Ingresa una dirección en México (ej. Av. Reforma, CDMX o Acapulco)">
+    <button onclick="buscarDireccion()">Buscar Dirección</button>
+  </div>
+
+  <div id="info-panel">
+    <span id="resultado">Ingresa una ubicación para calcular el sensor sísmico en servicio más cercano.</span>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Leaflet JS 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Turf.js (Para cálculos geométricos y Diagrama de Voronoi)
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+
+  <script>
+      // 1. Inicializar mapa
+const map = L.map('map').setView([17.2, -97.0], 7);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 18,
+  attribution: '&copy; OpenStreetMap | SASMEX'
+}).addTo(map);
+
+// 2. Sensores en servicio (puntos negros exactos de la imagen)
+const sensoresData = [
+  // Zona Puebla / Tehuacán / N. Oaxaca
+  { id: "VH22", nombre: "VH22 - Puebla/Oaxaca", lat: 18.25, lng: -97.55 },
+  { id: "CH27", nombre: "CH27 - Tehuacán Norte", lat: 18.52, lng: -97.28 },
+  { id: "TM25", nombre: "TM25 - Veracruz Sur", lat: 18.72, lng: -96.25 },
+  { id: "CO25", nombre: "CO25 - Cospaque", lat: 18.28, lng: -95.95 },
+  
+  // Zona Oaxaca Centro / Mixteca / Valles
+  { id: "TC23", nombre: "TC23 - Oaxaca Mixteca", lat: 17.78, lng: -97.35 },
+  { id: "SI37", nombre: "SI37 - Oaxaca Centro", lat: 17.15, lng: -96.85 },
+  { id: "OX29", nombre: "OX29 - Oaxaca Valles", lat: 17.08, lng: -96.72 },
+  { id: "TA32", nombre: "TA32 - Tlacolula", lat: 17.02, lng: -96.48 },
+  { id: "CS33", nombre: "CS33 - Veracruz/Oaxaca", lat: 17.75, lng: -95.12 },
+
+  // Zona Guerrero / Costa Chica
+  { id: "MQ11", nombre: "MQ11 - Guerrero Costa", lat: 16.78, lng: -99.45 },
+  { id: "RE05", nombre: "RE05 - Guerrero Sur", lat: 16.72, lng: -99.25 },
+  { id: "HU12", nombre: "HU12 - Huamuxtitlán", lat: 16.65, lng: -98.92 },
+  { id: "MT02", nombre: "MT02 - Costa Chica", lat: 16.58, lng: -98.65 },
+  { id: "LG01", nombre: "LG01 - San Marcos", lat: 16.42, lng: -98.50 },
+
+  // Zona Oaxaca Costa (Pinotepa / Huatulco / Istmo)
+  { id: "LA03", nombre: "LA03 - Pinotepa", lat: 16.52, lng: -98.15 },
+  { id: "PG28", nombre: "PG28 - Pinotepa Grajales", lat: 16.45, lng: -97.85 },
+  { id: "TJ16", nombre: "TJ16 - Jamiltepec", lat: 16.48, lng: -97.50 },
+  { id: "HZ04", nombre: "HZ04 - Puerto Escondido W", lat: 16.12, lng: -97.30 },
+  { id: "TU05", nombre: "TU05 - Tututepec", lat: 15.95, lng: -97.12 },
+  { id: "GX18", nombre: "GX18 - Miahuatlán", lat: 16.55, lng: -96.60 },
+  { id: "SV17", nombre: "SV17 - Sola de Vega", lat: 16.32, lng: -96.80 },
+  { id: "MX07", nombre: "MX07 - Costa Central", lat: 15.82, lng: -96.55 },
+  { id: "TN06", nombre: "TN06 - Pochutla", lat: 15.74, lng: -96.32 },
+  { id: "PA09", nombre: "PA09 - Puerto Ángel", lat: 15.68, lng: -96.15 },
+  { id: "TG10", nombre: "TG10 - Huatulco", lat: 15.83, lng: -95.92 },
+  { id: "HM11", nombre: "HM11 - Huatulco Este", lat: 15.92, lng: -95.68 },
+  { id: "LR14", nombre: "LR14 - Tehuantepec W", lat: 16.58, lng: -95.82 },
+  { id: "LC34", nombre: "LC34 - Istmo Centro", lat: 16.82, lng: -95.35 },
+  { id: "PS36", nombre: "PS36 - Istmo Norte", lat: 16.85, lng: -94.95 },
+  { id: "MA35", nombre: "MA35 - Matias Romero", lat: 16.52, lng: -94.82 },
+  { id: "MZ12", nombre: "MZ12 - Salina Cruz", lat: 16.18, lng: -95.20 }
+];
+
+let userMarker = null;
+
+// 3. Crear FeatureCollection para Turf.js
+const pointsGeoJSON = turf.featureCollection(
+  sensoresData.map(s => turf.point([s.lng, s.lat], { nombre: s.nombre, id: s.id }))
+);
+
+// 4. Diagrama de Voronoi delimitado al sur/centro de México
+const bbox = [-101.0, 14.5, -93.0, 20.0];
+const voronoiPolygons = turf.voronoi(pointsGeoJSON, { bbox: bbox });
+
+// Dibujar polígonos Voronoi
+L.geoJSON(voronoiPolygons, {
+  style: {
+    color: '#1f2937',
+    weight: 1,
+    fillColor: '#3b82f6',
+    fillOpacity: 0.12
+  }
+}).addTo(map);
+
+// 5. Dibujar los puntos negros (Sensores)
+sensoresData.forEach(sensor => {
+  L.circleMarker([sensor.lat, sensor.lng], {
+    radius: 5,
+    color: '#000000',
+    fillColor: '#000000',
+    fillOpacity: 1
+  })
+  .bindPopup(`<b>${sensor.nombre}</b><br>Estado: En servicio`)
+  .addTo(map);
+});
+
+// 6. Búsqueda y Voronoi
+async function buscarDireccion() {
+  const query = document.getElementById('search-input').value;
+  if (!query) return;
+
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Mexico')}`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.length === 0) {
+      alert("Dirección no encontrada.");
+      return;
+    }
+
+    const lat = parseFloat(data[0].lat);
+    const lng = parseFloat(data[0].lon);
+    const searchPoint = turf.point([lng, lat]);
+
+    map.setView([lat, lng], 10);
+
+    if (userMarker) map.removeLayer(userMarker);
+
+    userMarker = L.marker([lat, lng]).addTo(map)
+      .bindPopup(`<b>Ubicación:</b><br>${data[0].display_name}`)
+      .openPopup();
+
+    const nearest = turf.nearestPoint(searchPoint, pointsGeoJSON);
+    const distKm = turf.distance(searchPoint, nearest, { units: 'kilometers' }).toFixed(2);
+
+    document.getElementById('resultado').innerHTML = 
+      `📍 <b>Sensor más cercano:</b> ${nearest.properties.nombre} | 📏 <b>Distancia:</b> ${distKm} km`;
+
+  } catch (error) {
+    console.error(error);
+  }
+}
+  </script>
+</body>
+</html>
+-->
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voronoi SASMEX - Mapa Interactivo</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body, html { margin: 0; padding: 0; height: 100%; width: 100%; display: flex; flex-direction: column; }
+    
+    #header {
+      padding: 12px 20px;
+      background: #111827;
+      color: white;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    #search-input {
+      flex: 1;
+      max-width: 400px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      border: 1px solid #374151;
+      background: #1f2937;
+      color: white;
+      font-size: 14px;
+    }
+
+    #search-input::placeholder { color: #9ca3af; }
+
+    button {
+      padding: 10px 18px;
+      border: none;
+      background: #2563eb;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    button:hover { background: #1d4ed8; }
+
+    #info-panel {
+      padding: 10px 20px;
+      background: #1f2937;
+      color: #f3f4f6;
+      font-size: 14px;
+      border-top: 1px solid #374151;
+    }
+
+    #map { flex: 1; width: 100%; background: #0f172a; }
+  </style>
+</head>
+<body>
+
+  <div id="header">
+    <h3 style="margin: 0; font-size: 18px;">Diagrama de Voronoi - SASMEX</h3>
+    <input type="text" id="search-input" placeholder="Buscar dirección en México (ej: Oaxaca, Tehuacán, Acapulco...)">
+    <button onclick="buscarDireccion()">Buscar Dirección</button>
+  </div>
+
+  <div id="info-panel">
+    <span id="resultado">🔍 Ingresa una ubicación para determinar el sensor sísmico más cercano y su celda de Voronoi.</span>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Leaflet JS & Turf.js -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+
+  <script>
+    // 1. Coordenadas reales exactas de cada sensor negro mapeado en tu GeoGebra
+    const sensores = [
+      { id: "K", nombre: "CH27 (Tehuacán N.)", lat: 18.53, lng: -97.27 },
+      { id: "H", nombre: "TM25 (Veracruz Sur)", lat: 18.72, lng: -96.25 },
+      { id: "G", nombre: "CO25 (Cospaque)", lat: 18.28, lng: -95.95 },
+      { id: "I", nombre: "VH22 (Puebla / Oaxaca)", lat: 18.22, lng: -97.52 },
+      { id: "D", nombre: "YC28 (Huajuapan N.)", lat: 17.92, lng: -97.42 },
+      { id: "E", nombre: "TC23 (Oaxaca Mixteca)", lat: 17.68, lng: -97.22 },
+      { id: "F", nombre: "C24ROT (Oaxaca N.)", lat: 17.85, lng: -96.45 },
+      { id: "M", nombre: "EV21 (Guerrero/Oaxaca)", lat: 17.55, lng: -98.32 },
+      { id: "C", nombre: "VH22 (Norte Mixteca)", lat: 17.82, lng: -98.12 },
+      { id: "N", nombre: "MQ11 (Guerrero Costa)", lat: 16.78, lng: -99.45 },
+      { id: "O", nombre: "MT02 (Costa Chica)", lat: 16.58, lng: -98.65 },
+      { id: "Q", nombre: "LG01 (San Marcos)", lat: 16.42, lng: -98.50 },
+      { id: "P", nombre: "LA03 (Pinotepa)", lat: 16.52, lng: -98.15 },
+      { id: "R", nombre: "PG28 (Pinotepa Grajales)", lat: 16.38, lng: -97.85 },
+      { id: "S", nombre: "TJ16 (Jamiltepec)", lat: 16.28, lng: -97.50 },
+      { id: "T", nombre: "HZ04 (Puerto Escondido W)", lat: 16.02, lng: -97.30 },
+      { id: "U", nombre: "TU05 (Tututepec)", lat: 15.90, lng: -97.10 },
+      { id: "V", nombre: "MX07 (Costa Central)", lat: 15.80, lng: -96.55 },
+      { id: "A1", nombre: "TN06 (Pochutla)", lat: 15.72, lng: -96.32 },
+      { id: "B1", nombre: "PA09 (Puerto Ángel)", lat: 15.65, lng: -96.15 },
+      { id: "W", nombre: "TG10 (Huatulco)", lat: 15.80, lng: -95.92 },
+      { id: "X", nombre: "HM11 (Huatulco Este)", lat: 15.88, lng: -95.68 },
+      { id: "Y", nombre: "OX29 (Oaxaca Valles)", lat: 17.08, lng: -96.72 },
+      { id: "Z", nombre: "SI37 (Oaxaca Centro)", lat: 17.15, lng: -96.85 },
+      { id: "A", nombre: "TA32 (Tlacolula)", lat: 17.00, lng: -96.48 },
+      { id: "B", nombre: "GX18 (Miahuatlán)", lat: 16.52, lng: -96.60 },
+      { id: "C1", nombre: "SV17 (Sola de Vega)", lat: 16.30, lng: -96.80 },
+      { id: "D1", nombre: "LR14 (Tehuantepec W)", lat: 16.55, lng: -95.82 },
+      { id: "E1", nombre: "LC34 (Istmo Centro)", lat: 16.80, lng: -95.35 },
+      { id: "F1", nombre: "MA35 (Matias Romero)", lat: 16.50, lng: -94.82 },
+      { id: "G1", nombre: "PS36 (Istmo Norte)", lat: 16.82, lng: -94.95 },
+      { id: "H1", nombre: "CS33 (Veracruz/Oaxaca)", lat: 17.72, lng: -95.12 }
+    ];
+
+    // 2. Inicializar Mapa centrado en la región de la imagen
+    const map = L.map('map').setView([17.2, -96.8], 7);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap | SASMEX'
+    }).addTo(map);
+
+    // 3. Crear FeatureCollection de Turf
+    const pointsGeoJSON = turf.featureCollection(
+      sensores.map(s => turf.point([s.lng, s.lat], { id: s.id, nombre: s.nombre }))
+    );
+
+    // 4. Calcular Voronoi delimitado a la región
+    const bbox = [-101.5, 14.5, -93.5, 20.5];
+    const voronoiPolygons = turf.voronoi(pointsGeoJSON, { bbox: bbox });
+
+    // 5. Dibujar las líneas de Voronoi exactas (estilo similar a GeoGebra)
+    const voronoiLayer = L.geoJSON(voronoiPolygons, {
+      style: {
+        color: '#1e293b',
+        weight: 2,
+        fillColor: '#3b82f6',
+        fillOpacity: 0.15
+      }
+    }).addTo(map);
+
+    // 6. Dibujar los puntos azules con etiqueta (como en tu GeoGebra)
+    sensores.forEach(s => {
+      // Marcador de punto azul
+      L.circleMarker([s.lat, s.lng], {
+        radius: 6,
+        color: '#ffffff',
+        weight: 1.5,
+        fillColor: '#2563eb',
+        fillOpacity: 1
+      }).addTo(map).bindPopup(`<b>Punto ${s.id}</b><br>${s.nombre}`);
+
+      // Etiqueta del nombre/letra
+      L.tooltip({
+        permanent: true,
+        direction: 'right',
+        className: 'custom-label',
+        offset: [8, 0]
+      })
+      .setContent(`<b style="color: #1d4ed8; font-size: 12px;">${s.id}</b>`)
+      .setLatLng([s.lat, s.lng])
+      .addTo(map);
+    });
+
+    let userMarker = null;
+
+    // 7. Búsqueda y Voronoi dinámico
+    async function buscarDireccion() {
+      const query = document.getElementById('search-input').value;
+      if (!query) return;
+
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Mexico')}`;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.length === 0) {
+          alert("No se encontró la dirección especificada.");
+          return;
+        }
+
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        const searchPoint = turf.point([lng, lat]);
+
+        map.setView([lat, lng], 10);
+
+        if (userMarker) map.removeLayer(userMarker);
+
+        userMarker = L.marker([lat, lng]).addTo(map)
+          .bindPopup(`<b>Ubicación buscada:</b><br>${data[0].display_name}`)
+          .openPopup();
+
+        // Encontrar punto más cercano
+        const nearest = turf.nearestPoint(searchPoint, pointsGeoJSON);
+        const distKm = turf.distance(searchPoint, nearest, { units: 'kilometers' }).toFixed(2);
+
+        document.getElementById('resultado').innerHTML = 
+          `📍 <b>Ubicación:</b> ${data[0].display_name.split(',')[0]} | 🎯 <b>Sensor más cercano:</b> Punto ${nearest.properties.id} (${nearest.properties.nombre}) | 📏 <b>Distancia:</b> ${distKm} km`;
+
+      } catch (err) {
+        console.error(err);
+        alert("Ocurrió un error al buscar la dirección.");
+      }
+    }
+  </script>
+</body>
+</html>
