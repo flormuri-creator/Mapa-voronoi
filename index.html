@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!--<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -245,5 +245,200 @@
     // Inicializar mapa
     drawVoronoi();
 </script>
+</body>
+</html>
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa de Sensores Sísmicos y Diagrama de Voronoi</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    * { box-sizing: border-box; font-family: sans-serif; }
+    body, html { margin: 0; padding: 0; height: 100%; width: 100%; display: flex; flex-direction: column; }
+    
+    #header {
+      padding: 15px;
+      background: #1f2937;
+      color: white;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      z-index: 1000;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    #search-input {
+      flex: 1;
+      min-width: 250px;
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    button {
+      padding: 10px 15px;
+      border: none;
+      background: #2563eb;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover { background: #1d4ed8; }
+
+    #info-panel {
+      padding: 10px 15px;
+      background: #374151;
+      color: #e5e7eb;
+      width: 100%;
+      font-size: 14px;
+    }
+
+    #map { flex: 1; width: 100%; z-index: 1; }
+  </style>
+</head>
+<body>
+
+  <div id="header">
+    <h3 style="margin: 0 10px 0 0;">Sensores SASMEX (Voronoi)</h3>
+    <input type="text" id="search-input" placeholder="Ingresa una dirección en México (ej. Av. Reforma, CDMX o Acapulco)">
+    <button onclick="buscarDireccion()">Buscar Dirección</button>
+  </div>
+
+  <div id="info-panel">
+    <span id="resultado">Ingresa una ubicación para calcular el sensor sísmico en servicio más cercano.</span>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Turf.js (Para cálculos geométricos y Diagrama de Voronoi) -->
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+
+  <script>
+    // 1. Inicializar el mapa centrado en el sur/centro de México
+    const map = L.map('map').setView([17.5, -99.5], 6);
+
+    // Agregar capa del mapa (OpenStreetMap)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap contributors | SASMEX'
+    }).addTo(map);
+
+    // 2. Coordenadas aproximadas de los sensores sísmicos en servicio (SASMEX)
+    // Red de cobertura en la costa del Pacífico (Jalisco, Michoacán, Guerrero, Oaxaca) y zona central (Puebla, Morelos).
+    const sensoresData = [
+      { id: "S01", nombre: "Sensor Puerto Vallarta", lat: 20.6534, lng: -105.2253 },
+      { id: "S02", nombre: "Sensor El Grullo", lat: 19.8055, lng: -104.2178 },
+      { id: "S03", nombre: "Sensor Manzanillo", lat: 19.0522, lng: -104.3158 },
+      { id: "S04", nombre: "Sensor Tecomán", lat: 18.9125, lng: -103.8742 },
+      { id: "S05", nombre: "Sensor Coahuayana", lat: 18.7521, lng: -103.6741 },
+      { id: "S06", nombre: "Sensor Lázaro Cárdenas", lat: 17.9583, lng: -102.1965 },
+      { id: "S07", nombre: "Sensor Zihuatanejo", lat: 17.6413, lng: -101.5516 },
+      { id: "S08", nombre: "Sensor Tecpan", lat: 17.2215, lng: -100.6321 },
+      { id: "S09", nombre: "Sensor Atoyac", lat: 17.2081, lng: -100.4352 },
+      { id: "S10", nombre: "Sensor Coyuca", lat: 17.0094, lng: -100.0883 },
+      { id: "S11", nombre: "Sensor Acapulco", lat: 16.8531, lng: -99.8237 },
+      { id: "S12", nombre: "Sensor San Marcos", lat: 16.7912, lng: -99.3941 },
+      { id: "S13", nombre: "Sensor Ometepec", lat: 16.6847, lng: -98.4168 },
+      { id: "S14", nombre: "Sensor Pinotepa Nacional", lat: 16.3421, lng: -98.0543 },
+      { id: "S15", nombre: "Sensor Puerto Escondido", lat: 15.8617, lng: -97.0654 },
+      { id: "S16", nombre: "Sensor Huatulco", lat: 15.7725, lng: -96.1287 },
+      { id: "S17", nombre: "Sensor Salina Cruz", lat: 16.1812, lng: -95.1983 },
+      { id: "S18", nombre: "Sensor Tehuacán", lat: 18.4631, lng: -97.3931 },
+      { id: "S19", nombre: "Sensor Huajuapan de León", lat: 17.8083, lng: -97.7761 },
+      { id: "S20", nombre: "Sensor Cuernavaca", lat: 18.9261, lng: -99.2308 },
+      { id: "S21", nombre: "Sensor Izúcar de Matamoros", lat: 18.6014, lng: -98.4632 }
+    ];
+
+    let userMarker = null;
+
+    // 3. Crear FeatureCollection de GeoJSON para Turf.js
+    const pointsGeoJSON = turf.featureCollection(
+      sensoresData.map(s => turf.point([s.lng, s.lat], { nombre: s.nombre, id: s.id }))
+    );
+
+    // 4. Generar polígonos de Voronoi
+    // Definir un rectángulo que envuelva la zona de cobertura sísmica
+    const bbox = [-107.0, 14.0, -93.0, 22.0];
+    const voronoiPolygons = turf.voronoi(pointsGeoJSON, { bbox: bbox });
+
+    // Dibujar la capa de Voronoi en el mapa
+    L.geoJSON(voronoiPolygons, {
+      style: {
+        color: '#2563eb',
+        weight: 1.5,
+        fillColor: '#60a5fa',
+        fillOpacity: 0.15
+      }
+    }).addTo(map);
+
+    // 5. Agregar marcadores para los sensores en servicio
+    sensoresData.forEach(sensor => {
+      L.circleMarker([sensor.lat, sensor.lng], {
+        radius: 6,
+        color: '#dc2626',
+        fillColor: '#ef4444',
+        fillOpacity: 0.9
+      })
+      .bindPopup(`<b>${sensor.nombre}</b><br>Estado: En servicio`)
+      .addTo(map);
+    });
+
+    // 6. Función para buscar direcciones mediante Nominatim API (Geocoding)
+    async function buscarDireccion() {
+      const query = document.getElementById('search-input').value;
+      if (!query) return;
+
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Mexico')}`;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.length === 0) {
+          alert("No se encontró la dirección. Intenta especificar más detalles (ej. ciudad o estado).");
+          return;
+        }
+
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        const searchPoint = turf.point([lng, lat]);
+
+        // Mover el mapa a la posición encontrada
+        map.setView([lat, lng], 11);
+
+        // Quitar marcador previo si existe
+        if (userMarker) map.removeLayer(userMarker);
+
+        // Crear nuevo marcador para la posición buscada
+        userMarker = L.marker([lat, lng]).addTo(map)
+          .bindPopup(`<b>Ubicación buscada:</b><br>${data[0].display_name}`)
+          .openPopup();
+
+        // 7. Encontrar el sensor más cercano mediante Turf.js (Nearest Point)
+        const nearest = turf.nearestPoint(searchPoint, pointsGeoJSON);
+        const distKm = turf.distance(searchPoint, nearest, { units: 'kilometers' }).toFixed(2);
+
+        // Mostrar resultado en pantalla
+        document.getElementById('resultado').innerHTML = 
+          `📍 <b>Sensor más cercano:</b> ${nearest.properties.nombre} | 📏 <b>Distancia:</b> ${distKm} km`;
+
+      } catch (error) {
+        console.error("Error al buscar la dirección:", error);
+        alert("Ocurrió un error al realizar la búsqueda.");
+      }
+    }
+  </script>
 </body>
 </html>
