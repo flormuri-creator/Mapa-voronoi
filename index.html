@@ -326,119 +326,127 @@
   <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 
   <script>
-    // 1. Inicializar el mapa centrado en el sur/centro de México
-    const map = L.map('map').setView([17.5, -99.5], 6);
+      // 1. Inicializar mapa
+const map = L.map('map').setView([17.2, -97.0], 7);
 
-    // Agregar capa del mapa (OpenStreetMap)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18,
-      attribution: '&copy; OpenStreetMap contributors | SASMEX'
-    }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 18,
+  attribution: '&copy; OpenStreetMap | SASMEX'
+}).addTo(map);
 
-    // 2. Coordenadas aproximadas de los sensores sísmicos en servicio (SASMEX)
-    // Red de cobertura en la costa del Pacífico (Jalisco, Michoacán, Guerrero, Oaxaca) y zona central (Puebla, Morelos).
-    const sensoresData = [
-      { id: "S01", nombre: "Sensor Puerto Vallarta", lat: 20.6534, lng: -105.2253 },
-      { id: "S02", nombre: "Sensor El Grullo", lat: 19.8055, lng: -104.2178 },
-      { id: "S03", nombre: "Sensor Manzanillo", lat: 19.0522, lng: -104.3158 },
-      { id: "S04", nombre: "Sensor Tecomán", lat: 18.9125, lng: -103.8742 },
-      { id: "S05", nombre: "Sensor Coahuayana", lat: 18.7521, lng: -103.6741 },
-      { id: "S06", nombre: "Sensor Lázaro Cárdenas", lat: 17.9583, lng: -102.1965 },
-      { id: "S07", nombre: "Sensor Zihuatanejo", lat: 17.6413, lng: -101.5516 },
-      { id: "S08", nombre: "Sensor Tecpan", lat: 17.2215, lng: -100.6321 },
-      { id: "S09", nombre: "Sensor Atoyac", lat: 17.2081, lng: -100.4352 },
-      { id: "S10", nombre: "Sensor Coyuca", lat: 17.0094, lng: -100.0883 },
-      { id: "S11", nombre: "Sensor Acapulco", lat: 16.8531, lng: -99.8237 },
-      { id: "S12", nombre: "Sensor San Marcos", lat: 16.7912, lng: -99.3941 },
-      { id: "S13", nombre: "Sensor Ometepec", lat: 16.6847, lng: -98.4168 },
-      { id: "S14", nombre: "Sensor Pinotepa Nacional", lat: 16.3421, lng: -98.0543 },
-      { id: "S15", nombre: "Sensor Puerto Escondido", lat: 15.8617, lng: -97.0654 },
-      { id: "S16", nombre: "Sensor Huatulco", lat: 15.7725, lng: -96.1287 },
-      { id: "S17", nombre: "Sensor Salina Cruz", lat: 16.1812, lng: -95.1983 },
-      { id: "S18", nombre: "Sensor Tehuacán", lat: 18.4631, lng: -97.3931 },
-      { id: "S19", nombre: "Sensor Huajuapan de León", lat: 17.8083, lng: -97.7761 },
-      { id: "S20", nombre: "Sensor Cuernavaca", lat: 18.9261, lng: -99.2308 },
-      { id: "S21", nombre: "Sensor Izúcar de Matamoros", lat: 18.6014, lng: -98.4632 }
-    ];
+// 2. Sensores en servicio (puntos negros exactos de la imagen)
+const sensoresData = [
+  // Zona Puebla / Tehuacán / N. Oaxaca
+  { id: "VH22", nombre: "VH22 - Puebla/Oaxaca", lat: 18.25, lng: -97.55 },
+  { id: "CH27", nombre: "CH27 - Tehuacán Norte", lat: 18.52, lng: -97.28 },
+  { id: "TM25", nombre: "TM25 - Veracruz Sur", lat: 18.72, lng: -96.25 },
+  { id: "CO25", nombre: "CO25 - Cospaque", lat: 18.28, lng: -95.95 },
+  
+  // Zona Oaxaca Centro / Mixteca / Valles
+  { id: "TC23", nombre: "TC23 - Oaxaca Mixteca", lat: 17.78, lng: -97.35 },
+  { id: "SI37", nombre: "SI37 - Oaxaca Centro", lat: 17.15, lng: -96.85 },
+  { id: "OX29", nombre: "OX29 - Oaxaca Valles", lat: 17.08, lng: -96.72 },
+  { id: "TA32", nombre: "TA32 - Tlacolula", lat: 17.02, lng: -96.48 },
+  { id: "CS33", nombre: "CS33 - Veracruz/Oaxaca", lat: 17.75, lng: -95.12 },
 
-    let userMarker = null;
+  // Zona Guerrero / Costa Chica
+  { id: "MQ11", nombre: "MQ11 - Guerrero Costa", lat: 16.78, lng: -99.45 },
+  { id: "RE05", nombre: "RE05 - Guerrero Sur", lat: 16.72, lng: -99.25 },
+  { id: "HU12", nombre: "HU12 - Huamuxtitlán", lat: 16.65, lng: -98.92 },
+  { id: "MT02", nombre: "MT02 - Costa Chica", lat: 16.58, lng: -98.65 },
+  { id: "LG01", nombre: "LG01 - San Marcos", lat: 16.42, lng: -98.50 },
 
-    // 3. Crear FeatureCollection de GeoJSON para Turf.js
-    const pointsGeoJSON = turf.featureCollection(
-      sensoresData.map(s => turf.point([s.lng, s.lat], { nombre: s.nombre, id: s.id }))
-    );
+  // Zona Oaxaca Costa (Pinotepa / Huatulco / Istmo)
+  { id: "LA03", nombre: "LA03 - Pinotepa", lat: 16.52, lng: -98.15 },
+  { id: "PG28", nombre: "PG28 - Pinotepa Grajales", lat: 16.45, lng: -97.85 },
+  { id: "TJ16", nombre: "TJ16 - Jamiltepec", lat: 16.48, lng: -97.50 },
+  { id: "HZ04", nombre: "HZ04 - Puerto Escondido W", lat: 16.12, lng: -97.30 },
+  { id: "TU05", nombre: "TU05 - Tututepec", lat: 15.95, lng: -97.12 },
+  { id: "GX18", nombre: "GX18 - Miahuatlán", lat: 16.55, lng: -96.60 },
+  { id: "SV17", nombre: "SV17 - Sola de Vega", lat: 16.32, lng: -96.80 },
+  { id: "MX07", nombre: "MX07 - Costa Central", lat: 15.82, lng: -96.55 },
+  { id: "TN06", nombre: "TN06 - Pochutla", lat: 15.74, lng: -96.32 },
+  { id: "PA09", nombre: "PA09 - Puerto Ángel", lat: 15.68, lng: -96.15 },
+  { id: "TG10", nombre: "TG10 - Huatulco", lat: 15.83, lng: -95.92 },
+  { id: "HM11", nombre: "HM11 - Huatulco Este", lat: 15.92, lng: -95.68 },
+  { id: "LR14", nombre: "LR14 - Tehuantepec W", lat: 16.58, lng: -95.82 },
+  { id: "LC34", nombre: "LC34 - Istmo Centro", lat: 16.82, lng: -95.35 },
+  { id: "PS36", nombre: "PS36 - Istmo Norte", lat: 16.85, lng: -94.95 },
+  { id: "MA35", nombre: "MA35 - Matias Romero", lat: 16.52, lng: -94.82 },
+  { id: "MZ12", nombre: "MZ12 - Salina Cruz", lat: 16.18, lng: -95.20 }
+];
 
-    // 4. Generar polígonos de Voronoi
-    // Definir un rectángulo que envuelva la zona de cobertura sísmica
-    const bbox = [-107.0, 14.0, -93.0, 22.0];
-    const voronoiPolygons = turf.voronoi(pointsGeoJSON, { bbox: bbox });
+let userMarker = null;
 
-    // Dibujar la capa de Voronoi en el mapa
-    L.geoJSON(voronoiPolygons, {
-      style: {
-        color: '#2563eb',
-        weight: 1.5,
-        fillColor: '#60a5fa',
-        fillOpacity: 0.15
-      }
-    }).addTo(map);
+// 3. Crear FeatureCollection para Turf.js
+const pointsGeoJSON = turf.featureCollection(
+  sensoresData.map(s => turf.point([s.lng, s.lat], { nombre: s.nombre, id: s.id }))
+);
 
-    // 5. Agregar marcadores para los sensores en servicio
-    sensoresData.forEach(sensor => {
-      L.circleMarker([sensor.lat, sensor.lng], {
-        radius: 6,
-        color: '#dc2626',
-        fillColor: '#ef4444',
-        fillOpacity: 0.9
-      })
-      .bindPopup(`<b>${sensor.nombre}</b><br>Estado: En servicio`)
-      .addTo(map);
-    });
+// 4. Diagrama de Voronoi delimitado al sur/centro de México
+const bbox = [-101.0, 14.5, -93.0, 20.0];
+const voronoiPolygons = turf.voronoi(pointsGeoJSON, { bbox: bbox });
 
-    // 6. Función para buscar direcciones mediante Nominatim API (Geocoding)
-    async function buscarDireccion() {
-      const query = document.getElementById('search-input').value;
-      if (!query) return;
+// Dibujar polígonos Voronoi
+L.geoJSON(voronoiPolygons, {
+  style: {
+    color: '#1f2937',
+    weight: 1,
+    fillColor: '#3b82f6',
+    fillOpacity: 0.12
+  }
+}).addTo(map);
 
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Mexico')}`;
+// 5. Dibujar los puntos negros (Sensores)
+sensoresData.forEach(sensor => {
+  L.circleMarker([sensor.lat, sensor.lng], {
+    radius: 5,
+    color: '#000000',
+    fillColor: '#000000',
+    fillOpacity: 1
+  })
+  .bindPopup(`<b>${sensor.nombre}</b><br>Estado: En servicio`)
+  .addTo(map);
+});
 
-      try {
-        const response = await fetch(url);
-        const data = await response.json();
+// 6. Búsqueda y Voronoi
+async function buscarDireccion() {
+  const query = document.getElementById('search-input').value;
+  if (!query) return;
 
-        if (data.length === 0) {
-          alert("No se encontró la dirección. Intenta especificar más detalles (ej. ciudad o estado).");
-          return;
-        }
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Mexico')}`;
 
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
-        const searchPoint = turf.point([lng, lat]);
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
 
-        // Mover el mapa a la posición encontrada
-        map.setView([lat, lng], 11);
-
-        // Quitar marcador previo si existe
-        if (userMarker) map.removeLayer(userMarker);
-
-        // Crear nuevo marcador para la posición buscada
-        userMarker = L.marker([lat, lng]).addTo(map)
-          .bindPopup(`<b>Ubicación buscada:</b><br>${data[0].display_name}`)
-          .openPopup();
-
-        // 7. Encontrar el sensor más cercano mediante Turf.js (Nearest Point)
-        const nearest = turf.nearestPoint(searchPoint, pointsGeoJSON);
-        const distKm = turf.distance(searchPoint, nearest, { units: 'kilometers' }).toFixed(2);
-
-        // Mostrar resultado en pantalla
-        document.getElementById('resultado').innerHTML = 
-          `📍 <b>Sensor más cercano:</b> ${nearest.properties.nombre} | 📏 <b>Distancia:</b> ${distKm} km`;
-
-      } catch (error) {
-        console.error("Error al buscar la dirección:", error);
-        alert("Ocurrió un error al realizar la búsqueda.");
-      }
+    if (data.length === 0) {
+      alert("Dirección no encontrada.");
+      return;
     }
+
+    const lat = parseFloat(data[0].lat);
+    const lng = parseFloat(data[0].lon);
+    const searchPoint = turf.point([lng, lat]);
+
+    map.setView([lat, lng], 10);
+
+    if (userMarker) map.removeLayer(userMarker);
+
+    userMarker = L.marker([lat, lng]).addTo(map)
+      .bindPopup(`<b>Ubicación:</b><br>${data[0].display_name}`)
+      .openPopup();
+
+    const nearest = turf.nearestPoint(searchPoint, pointsGeoJSON);
+    const distKm = turf.distance(searchPoint, nearest, { units: 'kilometers' }).toFixed(2);
+
+    document.getElementById('resultado').innerHTML = 
+      `📍 <b>Sensor más cercano:</b> ${nearest.properties.nombre} | 📏 <b>Distancia:</b> ${distKm} km`;
+
+  } catch (error) {
+    console.error(error);
+  }
+}
   </script>
 </body>
 </html>
